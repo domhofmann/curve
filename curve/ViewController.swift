@@ -8,6 +8,59 @@
 
 import UIKit
 
+protocol Tweenable {
+    static func tweenedValue(begin: Self, end: Self, progress: Float) -> Self
+}
+
+extension Float: Tweenable {
+    typealias ValueType = Float
+    static func tweenedValue(begin: Float, end: Float, progress: Float) -> Float {
+        return begin + (end - begin) * progress
+    }
+}
+
+extension CGFloat: Tweenable {
+    static func tweenedValue(begin: CGFloat, end: CGFloat, progress: Float) -> CGFloat {
+        return begin + (end - begin) * CGFloat(progress)
+    }
+}
+
+extension Double: Tweenable {
+    static func tweenedValue(begin: Double, end: Double, progress: Float) -> Double {
+        return begin + (end - begin) * Double(progress)
+    }
+}
+
+extension CGPoint: Tweenable {
+    static func tweenedValue(begin: CGPoint, end: CGPoint, progress: Float) -> CGPoint {
+        let diff = CGPoint(x: end.x - begin.x, y: end.y - begin.y)
+        return CGPoint(x: begin.x + diff.x * CGFloat(progress), y: begin.y + diff.y * CGFloat(progress))
+    }
+}
+
+extension CGSize: Tweenable {
+    static func tweenedValue(begin: CGSize, end: CGSize, progress: Float) -> CGSize {
+        let diff = CGSize(width: end.width - begin.width, height: end.height - begin.height)
+        return CGSize(width: begin.width + diff.width * CGFloat(progress), height: begin.height + diff.height * CGFloat(progress))
+    }
+}
+
+extension CGRect: Tweenable {
+    static func tweenedValue(begin: CGRect, end: CGRect, progress: Float) -> CGRect {
+        let origin = CGPoint.tweenedValue(begin: begin.origin, end: end.origin, progress: progress)
+        let size = CGSize.tweenedValue(begin: begin.size, end: end.size, progress: progress)
+        return CGRect(origin: origin, size: size)
+    }
+}
+
+extension UIView {
+    func animateFrame(to endValue: CGRect, in duration: Double) -> Curve.Animation<CGRect> {
+        return Curve.from(self.frame, to: endValue, in: duration).change({ (value: CGRect) in
+            self.frame = value
+        })
+    }
+}
+
 class Curve {
     typealias TimingFunction = (TimingProps) -> (Float)
     
@@ -161,31 +214,48 @@ class Curve {
         }
     }
     
-    class Animation: Hashable {
-        var startValues: [Float]
-        var endValues: [Float]
+    class AbstractAnimation: Hashable {
+        var completed: Bool = false
+        
+        // MARK: - Hashable
+        
+        static func ==(lhs: AbstractAnimation, rhs: AbstractAnimation) -> Bool {
+            return ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
+        }
+        
+        var hashValue: Int {
+            return ObjectIdentifier(self).hashValue
+        }
+        
+        func tick(time: Double) {
+            
+        }
+    }
+    
+    class Animation<T: Tweenable>: AbstractAnimation {
+        var startValues: [T]
+        var endValues: [T]
         var duration: Double
         var equation: EasingEquation = .linear
-        var changeFunctionSingle: ((Float) -> Void)?
-        var changeFunctionMany: (([Float]) -> Void)?
+        var changeFunctionSingle: ((T) -> Void)?
+        var changeFunctionMany: (([T]) -> Void)?
         var completeFunction: ((Bool) -> Void)?
         var startTime: Double = 0
         var endTime: Double = 0
-        var completed: Bool = false
         
-        init(startValue: Float, endValue: Float, duration: Double) {
+        init(startValue: T, endValue: T, duration: Double) {
             self.startValues = [startValue]
             self.endValues = [endValue]
             self.duration = duration
         }
         
-        init(startValues: [Float], endValues: [Float], duration: Double) {
+        init(startValues: [T], endValues: [T], duration: Double) {
             self.startValues = startValues
             self.endValues = endValues
             self.duration = duration
         }
         
-        @discardableResult func animate(_ equation: EasingEquation = .linear) -> Animation {
+        @discardableResult func animate(_ equation: EasingEquation = .linear) -> Animation<T> {
             self.equation = equation
             self.startTime = CACurrentMediaTime()
             self.endTime = self.startTime + duration
@@ -196,22 +266,22 @@ class Curve {
             return self
         }
         
-        @discardableResult func change(_ changeFunction: @escaping ((Float) -> Void)) -> Animation {
+        @discardableResult func change(_ changeFunction: @escaping ((T) -> Void)) -> Animation<T> {
             self.changeFunctionSingle = changeFunction
             return self
         }
         
-        @discardableResult func change(_ changeFunction: @escaping (([Float]) -> Void)) -> Animation {
+        @discardableResult func change(_ changeFunction: @escaping (([T]) -> Void)) -> Animation<T> {
             self.changeFunctionMany = changeFunction
             return self
         }
         
-        @discardableResult func completion(_ completeFunction: @escaping ((Bool) -> Void)) -> Animation {
+        @discardableResult func completion(_ completeFunction: @escaping ((Bool) -> Void)) -> Animation<T> {
             self.completeFunction = completeFunction
             return self
         }
         
-        func tick(time: Double) {
+        override func tick(time: Double) {
             var time = time
             if time > self.endTime {
                 time = self.endTime
@@ -220,22 +290,20 @@ class Curve {
             let t = time - self.startTime
             
             if (startValues.count > 1) {
-                var results = Array<Float>()
+                var results = Array<T>()
                 for i in 0..<startValues.count {
-                    let c = endValues[i] - startValues[i]
-                    print(t, startValues, c, duration)
-                    let props = TimingProps(Float(t), startValues[i], c, Float(duration))
-                    let result = equation.functionForType()(props)
+                    let props = TimingProps(Float(t), 0, 1, Float(duration))
+                    let progress = equation.functionForType()(props)
+                    let result = type(of: startValues[0]).tweenedValue(begin: startValues[i], end: endValues[i], progress: progress)
                     results.append(result)
                 }
                 if let change = changeFunctionMany {
                     change(results)
                 }
             } else {
-                let c = endValues[0] - startValues[0]
-                print(t, startValues, c, duration)
-                let props = TimingProps(Float(t), startValues[0], c, Float(duration))
-                let result = equation.functionForType()(props)
+                let props = TimingProps(Float(t), 0, 1, Float(duration))
+                let progress = equation.functionForType()(props)
+                let result = type(of: startValues[0]).tweenedValue(begin: startValues[0], end: endValues[0], progress: progress)
                 if let change = changeFunctionSingle {
                     change(result)
                 }
@@ -249,45 +317,19 @@ class Curve {
                 }
             }
         }
-        
-        // MARK: - Hashable
-        
-        static func ==(lhs: Animation, rhs: Animation) -> Bool {
-            return ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
-        }
-        
-        var hashValue: Int {
-            return ObjectIdentifier(self).hashValue
-        }
     }
     
     public static var targetFramerate: Float = 60.0
-    static var animations: Set<Animation> = Set<Animation>()
+    static var animations: Set<AbstractAnimation> = Set<AbstractAnimation>()
     static var hasStarted: Bool = false
     static var displayLink: CADisplayLink? = nil
     
-    @discardableResult public static func from(_ startValue: Float, to endValue: Float, in duration: Double = 0.35) -> Animation {
-        return Animation(startValues: [startValue], endValues: [endValue], duration: duration)
+    @discardableResult public static func from<T: Tweenable>(_ startValue: T, to endValue: T, in duration: Double) -> Animation<T> {
+        return Animation<T>(startValues: [startValue], endValues: [endValue], duration: duration)
     }
     
-    @discardableResult public static func from(_ startValue: Double, to endValue: Double, in duration: Double = 0.35) -> Animation {
-        return from(Float(startValue), to: Float(endValue), in: duration)
-    }
-    
-    @discardableResult public static func from(_ startValue: CGFloat, to endValue: CGFloat, in duration: Double = 0.35) -> Animation {
-        return from(Float(startValue), to: Float(endValue), in: duration)
-    }
-    
-    @discardableResult public static func fromMany(_ startValues: [Float], to endValues: [Float], in duration: Double = 0.35) -> Animation {
-        return Animation(startValues: startValues, endValues: endValues, duration: duration)
-    }
-    
-    @discardableResult public static func fromMany(_ startValues: [Double], to endValues: [Double], in duration: Double = 0.35) -> Animation {
-        return fromMany(startValues.map { Float($0) }, to: endValues.map { Float($0) }, in: duration)
-    }
-    
-    @discardableResult public static func fromMany(_ startValues: [CGFloat], to endValues: [CGFloat], in duration: Double = 0.35) -> Animation {
-        return fromMany(startValues.map { Float($0) }, to: endValues.map { Float($0) }, in: duration)
+    @discardableResult public static func from<T: Tweenable>(_ startValues: [T], to endValues: [T], in duration: Double) -> Animation<T> {
+        return Animation<T>(startValues: startValues, endValues: endValues, duration: duration)
     }
     
     private static func start() {
@@ -305,7 +347,7 @@ class Curve {
     
     @objc private static func tick(displayLink: CADisplayLink) {
         let time = CACurrentMediaTime()
-        var completedAnimations = Set<Animation>()
+        var completedAnimations = Set<AbstractAnimation>()
         for animation in animations {
             animation.tick(time: time)
             if animation.completed == true {
@@ -328,14 +370,23 @@ class ViewController: UIViewController {
         square.backgroundColor = UIColor.red
         view.addSubview(square)
         
-        Curve.from(square.center.y, to: square.center.y + 100, in: 2).animate(.backOut(overshoot: 5))
-            .change { (value: Float) in
-                square.center.y = CGFloat(value)
+        Curve.from(square.center.y, to: square.center.y + 100, in: 2).animate(.linear)
+            .change { (value: CGFloat) in
+                square.center.y = value
             }
             .completion { (completed: Bool) in
                 print(completed)
             }
         
+//        Curve.from(square.center, to: CGPoint(x: square.center.x + 100, y: square.center.y + 100), in: 2).animate(.backOut(overshoot: 5))
+//        .change { (value: CGPoint) in
+//            square.center = value
+//        }
+//        .completion { (completed: Bool) in
+//            print(completed)
+//        }
+        
+        square.animateFrame(to: square.frame.offsetBy(dx: 100, dy: 100), in: 2).animate(.backOut(overshoot: 5))
     }
 }
 
