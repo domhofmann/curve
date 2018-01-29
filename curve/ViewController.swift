@@ -360,6 +360,7 @@ class Curve {
     
     class AbstractAnimation: Hashable {
         var completed: Bool = false
+        var cancelled: Bool = false
         
         // MARK: - Hashable
         
@@ -408,6 +409,17 @@ class Curve {
             return run(.linear, delay: delay)
         }
         
+        @discardableResult func cancel(complete: Bool = true) -> Animation<T> {
+            if (!complete)
+            {
+                cancelled = true
+                return self
+            }
+            self.endTime = CACurrentMediaTime()
+            tick(time: CACurrentMediaTime())
+            return self
+        }
+        
         @discardableResult func change(_ changeFunction: @escaping ((T) -> Void)) -> Animation<T> {
             self.changeFunctionSingle = changeFunction
             return self
@@ -424,6 +436,7 @@ class Curve {
         }
         
         override func tick(time: Double) {
+//            guard case cancelled == false else return
             var time = time
             if time > self.endTime {
                 time = self.endTime
