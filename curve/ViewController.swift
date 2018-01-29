@@ -12,6 +12,17 @@ protocol Tweenable {
     static func tweenedValue(begin: Self, end: Self, progress: Float) -> Self
 }
 
+protocol WrappedTweenable: Tweenable {
+    associatedtype WrappedType
+    init(_ obj: WrappedType)
+    func unwrap() -> WrappedType
+}
+
+protocol Wrappable {
+    associatedtype WrappedContainerType
+    func wrap() -> WrappedContainerType
+}
+
 extension Float: Tweenable {
     typealias ValueType = Float
     static func tweenedValue(begin: Float, end: Float, progress: Float) -> Float {
@@ -53,10 +64,143 @@ extension CGRect: Tweenable {
     }
 }
 
+extension CATransform3D: Tweenable {
+    static func tweenedValue(begin: CATransform3D, end: CATransform3D, progress: Float) -> CATransform3D {
+        return CATransform3D(
+            m11: CGFloat.tweenedValue(begin: begin.m11, end: end.m11, progress: progress),
+            m12: CGFloat.tweenedValue(begin: begin.m12, end: end.m12, progress: progress),
+            m13: CGFloat.tweenedValue(begin: begin.m13, end: end.m13, progress: progress),
+            m14: CGFloat.tweenedValue(begin: begin.m14, end: end.m14, progress: progress),
+            m21: CGFloat.tweenedValue(begin: begin.m21, end: end.m21, progress: progress),
+            m22: CGFloat.tweenedValue(begin: begin.m22, end: end.m22, progress: progress),
+            m23: CGFloat.tweenedValue(begin: begin.m23, end: end.m23, progress: progress),
+            m24: CGFloat.tweenedValue(begin: begin.m24, end: end.m24, progress: progress),
+            m31: CGFloat.tweenedValue(begin: begin.m31, end: end.m31, progress: progress),
+            m32: CGFloat.tweenedValue(begin: begin.m32, end: end.m32, progress: progress),
+            m33: CGFloat.tweenedValue(begin: begin.m33, end: end.m33, progress: progress),
+            m34: CGFloat.tweenedValue(begin: begin.m34, end: end.m34, progress: progress),
+            m41: CGFloat.tweenedValue(begin: begin.m41, end: end.m41, progress: progress),
+            m42: CGFloat.tweenedValue(begin: begin.m42, end: end.m42, progress: progress),
+            m43: CGFloat.tweenedValue(begin: begin.m43, end: end.m43, progress: progress),
+            m44: CGFloat.tweenedValue(begin: begin.m44, end: end.m44, progress: progress)
+        )
+    }
+}
+
+extension CGAffineTransform: Tweenable {
+    static func tweenedValue(begin: CGAffineTransform, end: CGAffineTransform, progress: Float) -> CGAffineTransform {
+        return CGAffineTransform(
+            a:  CGFloat.tweenedValue(begin: begin.a,  end: end.a,  progress: progress),
+            b:  CGFloat.tweenedValue(begin: begin.b,  end: end.b,  progress: progress),
+            c:  CGFloat.tweenedValue(begin: begin.c,  end: end.c,  progress: progress),
+            d:  CGFloat.tweenedValue(begin: begin.d,  end: end.d,  progress: progress),
+            tx: CGFloat.tweenedValue(begin: begin.tx, end: end.tx, progress: progress),
+            ty: CGFloat.tweenedValue(begin: begin.ty, end: end.ty, progress: progress)
+        )
+    }
+}
+
+final class UIColorWrapper: WrappedTweenable {
+    typealias WrappedType = UIColor
+    let color: UIColor
+    
+    init(_ color: UIColor) {
+        self.color = color
+    }
+    
+    func unwrap() -> UIColor {
+        return color
+    }
+    
+    static func tweenedValue(begin: UIColorWrapper, end: UIColorWrapper, progress: Float) -> UIColorWrapper {
+        var redBegin: CGFloat = 0, greenBegin: CGFloat = 0, blueBegin: CGFloat = 0, alphaBegin: CGFloat = 0
+        var redEnd: CGFloat = 0, greenEnd: CGFloat = 0, blueEnd: CGFloat = 0, alphaEnd: CGFloat = 0
+        
+        if begin.color.getRed(&redBegin, green: &greenBegin, blue: &blueBegin, alpha: &alphaBegin)
+            && end.color.getRed(&redEnd, green: &greenEnd, blue: &blueEnd, alpha: &alphaEnd) {
+            
+            let tweenedColor = UIColor(
+                red: CGFloat.tweenedValue(begin: redBegin, end: redEnd, progress: progress),
+                green: CGFloat.tweenedValue(begin: greenBegin, end: greenEnd, progress: progress),
+                blue: CGFloat.tweenedValue(begin: blueBegin, end: blueEnd, progress: progress),
+                alpha: CGFloat.tweenedValue(begin: alphaBegin, end: alphaEnd, progress: progress)
+            )
+            
+            return UIColorWrapper(tweenedColor)
+        }
+        
+        return begin
+    }
+}
+
+extension UIColor: Wrappable {
+    typealias WrappedContainerType = UIColorWrapper
+    
+    func wrap() -> UIColorWrapper {
+        return UIColorWrapper(self)
+    }
+}
+
 extension UIView {
     func animateFrame(to endValue: CGRect, in duration: Double) -> Curve.Animation<CGRect> {
-        return Curve.from(self.frame, to: endValue, in: duration).change({ (value: CGRect) in
-            self.frame = value
+        return animate(\UIView.frame, to: endValue, in: duration)
+    }
+    
+    func animateFrame(from startValue: CGRect, to endValue: CGRect, in duration: Double) -> Curve.Animation<CGRect> {
+        return animate(\UIView.frame, from: startValue, to: endValue, in: duration)
+    }
+    
+    func animateCenter(to endValue: CGPoint, in duration: Double) -> Curve.Animation<CGPoint> {
+        return animate(\UIView.center, to: endValue, in: duration)
+    }
+    
+    func animateCenter(from startValue: CGPoint, to endValue: CGPoint, in duration: Double) -> Curve.Animation<CGPoint> {
+        return animate(\UIView.center, from: startValue, to: endValue, in: duration)
+    }
+    
+    func animateAlpha(to endValue: CGFloat, in duration: Double) -> Curve.Animation<CGFloat> {
+        return animate(\UIView.alpha, to: endValue, in: duration)
+    }
+    
+    func animateAlpha(from startValue: CGFloat, to endValue: CGFloat, in duration: Double) -> Curve.Animation<CGFloat> {
+        return animate(\UIView.alpha, from: startValue, to: endValue, in: duration)
+    }
+    
+    func animateBackgroundColor(to endValue: UIColor, in duration: Double) -> Curve.Animation<UIColorWrapper> {
+        if self.backgroundColor == nil {
+            self.backgroundColor = UIColor.clear
+        }
+        
+        return animate(\UIView.backgroundColor!, to: UIColorWrapper(endValue), in: duration)
+    }
+    
+    func animateBackgroundColor(from startValue: UIColor, to endValue: UIColor, in duration: Double) -> Curve.Animation<UIColorWrapper> {
+        return animate(\UIView.backgroundColor!, from: UIColorWrapper(startValue), to: UIColorWrapper(endValue), in: duration)
+    }
+    
+    func animate<T: Tweenable>(_ keyPath: ReferenceWritableKeyPath<UIView, T>, to endValue: T, in duration: Double) -> Curve.Animation<T> {
+        let currentValue = self[keyPath: keyPath]
+        return Curve.from(currentValue, to: endValue, in: duration).change({ (value: T) in
+            self[keyPath: keyPath] = value
+        })
+    }
+    
+    func animate<T: Tweenable>(_ keyPath: ReferenceWritableKeyPath<UIView, T>, from startValue: T, to endValue: T, in duration: Double) -> Curve.Animation<T> {
+        return Curve.from(startValue, to: endValue, in: duration).change({ (value: T) in
+            self[keyPath: keyPath] = value
+        })
+    }
+    
+    func animate<T: WrappedTweenable>(_ keyPath: ReferenceWritableKeyPath<UIView, T.WrappedType>, to endValue: T, in duration: Double) -> Curve.Animation<T> {
+        let currentValue = T.init(self[keyPath: keyPath])
+        return Curve.from(currentValue, to: endValue, in: duration).change({ (value: T) in
+            self[keyPath: keyPath] = value.unwrap()
+        })
+    }
+    
+    func animate<T: WrappedTweenable>(_ keyPath: ReferenceWritableKeyPath<UIView, T.WrappedType>, from startValue: T, to endValue: T, in duration: Double) -> Curve.Animation<T> {
+        return Curve.from(startValue, to: endValue, in: duration).change({ (value: T) in
+            self[keyPath: keyPath] = value.unwrap()
         })
     }
 }
@@ -243,27 +387,25 @@ class Curve {
         var startTime: Double = 0
         var endTime: Double = 0
         
-        init(startValue: T, endValue: T, duration: Double) {
-            self.startValues = [startValue]
-            self.endValues = [endValue]
-            self.duration = duration
-        }
-        
         init(startValues: [T], endValues: [T], duration: Double) {
             self.startValues = startValues
             self.endValues = endValues
             self.duration = duration
         }
         
-        @discardableResult func animate(_ equation: EasingEquation = .linear) -> Animation<T> {
+        @discardableResult func run(_ equation: EasingEquation = .linear, delay: Double = 0) -> Animation<T> {
             self.equation = equation
-            self.startTime = CACurrentMediaTime()
+            self.startTime = CACurrentMediaTime() + delay
             self.endTime = self.startTime + duration
             Curve.animations.insert(self)
             if !Curve.hasStarted {
                 Curve.start()
             }
             return self
+        }
+        
+        @discardableResult func run(delay: Double) -> Animation<T> {
+            return run(.linear, delay: delay)
         }
         
         @discardableResult func change(_ changeFunction: @escaping ((T) -> Void)) -> Animation<T> {
@@ -337,8 +479,6 @@ class Curve {
             return
         }
         
-        print("Starting")
-        
         displayLink = CADisplayLink(target: self, selector: #selector(tick))
         displayLink?.add(to: .current, forMode: .defaultRunLoopMode)
         
@@ -370,23 +510,17 @@ class ViewController: UIViewController {
         square.backgroundColor = UIColor.red
         view.addSubview(square)
         
-        Curve.from(square.center.y, to: square.center.y + 100, in: 2).animate(.linear)
-            .change { (value: CGFloat) in
-                square.center.y = value
-            }
-            .completion { (completed: Bool) in
-                print(completed)
-            }
+        square.animateBackgroundColor(to: UIColor.blue, in: 2).run()
         
-//        Curve.from(square.center, to: CGPoint(x: square.center.x + 100, y: square.center.y + 100), in: 2).animate(.backOut(overshoot: 5))
-//        .change { (value: CGPoint) in
-//            square.center = value
-//        }
-//        .completion { (completed: Bool) in
-//            print(completed)
-//        }
+//        Curve.from(square.center.y, to: square.center.y + 100, in: 2).run(.linear)
+//            .change {
+//                square.center.y = $0
+//            }
+//            .completion {
+//                print($0)
+//            }
         
-        square.animateFrame(to: square.frame.offsetBy(dx: 100, dy: 100), in: 2).animate(.backOut(overshoot: 5))
+        square.animateFrame(to: square.frame.offsetBy(dx: 100, dy: 100), in: 2).run(.backOut(overshoot: 5), delay: 0.5)
     }
 }
 
