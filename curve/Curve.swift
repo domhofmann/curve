@@ -206,6 +206,13 @@ extension UIView {
     }
 }
 
+extension CAKeyframeAnimation {
+    public func to(layer: CALayer, keyPath: String) {
+        self.keyPath = keyPath
+        layer.add(self, forKey: keyPath)
+    }
+}
+
 public class Curve {
     public typealias TimingFunction = (TimingProps) -> (Float)
     
@@ -413,6 +420,60 @@ public class Curve {
         
         @discardableResult func run(delay: Double) -> Animation<T> {
             return run(.linear, delay: delay)
+        }
+        
+        @discardableResult func render(_ equation: EasingEquation = .linear, framerate: Float = Curve.targetFramerate) -> CAKeyframeAnimation {
+            let numTicks = Int(ceil(Double(framerate) * duration)) + 1
+            let tickAmount = 1.0 / framerate
+            var timings = Array<NSNumber>()
+            var results = Array<T>()
+            for i in 0..<numTicks {
+                let timing = tickAmount * Float(i)
+                let props = TimingProps(timing, 0, 1, Float(duration))
+                let progress = equation.functionForType()(props)
+                let result = type(of: startValues[0]).tweenedValue(begin: startValues[0], end: endValues[0], progress: progress)
+                print("\(timing): \(result)")
+                
+                timings.append(NSNumber(value: timing / Float(duration))) // normalize to 0 -> 1
+                results.append(result)
+            }
+            
+            let anim = CAKeyframeAnimation()
+            anim.keyTimes = timings
+            anim.values = results
+            anim.duration = duration
+            anim.fillMode = kCAFillModeForwards
+            anim.isRemovedOnCompletion = false
+            return anim
+        }
+        
+        @discardableResult func render<T1, T2>(conversion: ((T1) -> T2), equation: EasingEquation = .linear, framerate: Float = Curve.targetFramerate) -> CAKeyframeAnimation? {
+            let numTicks = Int(ceil(Double(framerate) * duration)) + 1
+            let tickAmount = 1.0 / framerate
+            var timings = Array<NSNumber>()
+            var results = Array<T2>()
+            for i in 0..<numTicks {
+                let timing = tickAmount * Float(i)
+                let props = TimingProps(timing, 0, 1, Float(duration))
+                let progress = equation.functionForType()(props)
+                let result = type(of: startValues[0]).tweenedValue(begin: startValues[0], end: endValues[0], progress: progress)
+                if !(result is T1) {
+                    return nil
+                }
+                let convertedResult = conversion(result as! T1)
+                print("\(timing): \(convertedResult)")
+                
+                timings.append(NSNumber(value: timing / Float(duration))) // normalize to 0 -> 1
+                results.append(convertedResult)
+            }
+            
+            let anim = CAKeyframeAnimation()
+            anim.keyTimes = timings
+            anim.values = results
+            anim.duration = duration
+            anim.fillMode = kCAFillModeForwards
+            anim.isRemovedOnCompletion = false
+            return anim
         }
         
         @discardableResult func cancel(forceComplete: Bool = true) -> Animation<T> {

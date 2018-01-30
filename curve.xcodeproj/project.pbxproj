@@ -58,11 +58,11 @@
 			children = (
 				F245A681201A758F007E38F2 /* AppDelegate.swift */,
 				F245A683201A758F007E38F2 /* ViewController.swift */,
+				F27FFC7F2020D20500DBFFA2 /* Curve.swift */,
 				F245A685201A758F007E38F2 /* Main.storyboard */,
 				F245A688201A758F007E38F2 /* Assets.xcassets */,
 				F245A68A201A758F007E38F2 /* LaunchScreen.storyboard */,
 				F245A68D201A758F007E38F2 /* Info.plist */,
-				F27FFC7F2020D20500DBFFA2 /* Curve.swift */,
 			);
 			path = curve;
 			sourceTree = "<group>";

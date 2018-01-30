@@ -9,7 +9,7 @@
 import UIKit
 
 
-class ViewController: UIViewController {
+class ViewController: UIViewController {    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -18,7 +18,22 @@ class ViewController: UIViewController {
         square.backgroundColor = UIColor.red
         view.addSubview(square)
         
-        square.animateBackgroundColor(to: UIColor.blue, in: 2).run()
+//        square.animateBackgroundColor(to: UIColor.blue, in: 2).render()
+        
+        square.animateBackgroundColor(to: UIColor.blue, in: 2).render(conversion: { (value: UIColorWrapper) -> CGColor in
+            return value.unwrap().cgColor
+        })?.to(layer: square.layer, keyPath: "backgroundColor")
+        
+        Curve.from(square.center, to: CGPoint(x: square.center.x + 100, y: square.center.y + 100), in: 2)
+            .render(.backOut(overshoot: 40))
+            .to(layer: square.layer, keyPath: "position")
+    
+        
+//        {
+//            square.layer.add(caAnim, forKey: "backgroundColor")
+//        }
+        
+
         
 //        Curve.from(square.center.y, to: square.center.y + 100, in: 2).run(.linear)
 //            .change {
@@ -28,10 +43,10 @@ class ViewController: UIViewController {
 //                print($0)
 //            }
         
-        let anim = square.animateFrame(to: square.frame.offsetBy(dx: 100, dy: 100), in: 10).run(.backOut(overshoot: 5), delay: 0.5)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            anim.cancel()
-        }
+//        let anim = square.animateFrame(to: square.frame.offsetBy(dx: 100, dy: 100), in: 10).run(.backOut(overshoot: 5), delay: 0.5)
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+//            anim.cancel()
+//        }
     }
 }
 
