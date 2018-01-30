@@ -410,9 +410,11 @@ class Curve {
         }
         
         @discardableResult func cancel(complete: Bool = true) -> Animation<T> {
-            if (!complete)
-            {
+            if !complete {
                 cancelled = true
+                if let completeFunction = completeFunction {
+                    completeFunction(false)
+                }
                 return self
             }
             self.endTime = CACurrentMediaTime()
@@ -436,7 +438,7 @@ class Curve {
         }
         
         override func tick(time: Double) {
-//            guard case cancelled == false else return
+            if cancelled { return }
             var time = time
             if time > self.endTime {
                 time = self.endTime
@@ -523,7 +525,8 @@ class ViewController: UIViewController {
         square.backgroundColor = UIColor.red
         view.addSubview(square)
         
-        square.animateBackgroundColor(to: UIColor.blue, in: 2).run()
+        let anim = square.animateBackgroundColor(to: UIColor.blue, in: 2).run()
+//        DispatchQueue.main.
         
 //        Curve.from(square.center.y, to: square.center.y + 100, in: 2).run(.linear)
 //            .change {
