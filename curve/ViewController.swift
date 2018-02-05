@@ -43,10 +43,10 @@ class ViewController: UIViewController {
 //                print($0)
 //            }
         
-//        let anim = square.animateFrame(to: square.frame.offsetBy(dx: 100, dy: 100), in: 10).run(.backOut(overshoot: 5), delay: 0.5)
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-//            anim.cancel()
-//        }
+        let anim = square.animateFrame(to: square.frame.offsetBy(dx: 100, dy: 100), in: 10).run(.backOut(overshoot: 5), delay: 0.5)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            anim.cancel()
+        }
     }
 }
 

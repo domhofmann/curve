@@ -25,7 +25,6 @@ public protocol Wrappable {
 }
 
 extension Float: Tweenable {
-    typealias ValueType = Float
     public static func tweenedValue(begin: Float, end: Float, progress: Float) -> Float {
         return begin + (end - begin) * progress
     }
